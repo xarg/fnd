@@ -26,30 +26,28 @@ func show_usage() {
 func regexp_escape(c byte) string{
 	if bytes.IndexByte([]byte(alpha_num), c) == -1 {
 		if c == '\000'{
-			return string("\\000")
+			return "\\000"
 		} else {
-			return string('\\' + c)
+			return "\\" + string(c)
 		}
 	}
 	return string(c)
 }
 
 // Translate *nix like pattern. Ex: *.py to .*\.py for regexp
-func unix2regexp(pat string) string{
+func unix2regexp(pattern string) string{
 	res := ""
-	i := 0
-	for i < len(pat) {
-		c := pat[i]
-		i = i + 1
-		if c == '*' {
-			res = res + ".*"
-		} else if c == '?' {
-			res = res + "."
-		} else {
-			res = res + regexp_escape(c)
+	for _, c := range pattern {
+		switch c {
+			default:
+				res = res + regexp_escape(byte(c))
+			case '*':
+				res = res + ".*"
+			case '?':
+				res = res + "."
 		}
 	}
-	return res + "$"
+	return res
 }
 
 func print_file(file_info os.FileInfo) {
