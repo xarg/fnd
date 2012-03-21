@@ -2,20 +2,22 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"flag"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 )
 
+const alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 var (
-	regexp_flag = flag.String("e", "", "Use regexp") 
-	filetype_flag = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks") 
-	alpha_num = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	regexpFlag   = flag.String("e", "", "Use regexp")
+	filetypeFlag = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks")
 )
 
-func show_usage() {
+func showUsage() {
 	fmt.Fprintf(os.Stderr,
 		"Usage: %s [pattern]\n\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "Flags:\n")
@@ -23,9 +25,9 @@ func show_usage() {
 }
 
 //escape alpha numeric patterns
-func regexp_escape(c byte) string{
-	if bytes.IndexByte([]byte(alpha_num), c) == -1 {
-		if c == '\000'{
+func regexpEscape(c byte) string {
+	if bytes.IndexByte([]byte(alphaNum), c) == -1 {
+		if c == '\000' {
 			return "\\000"
 		} else {
 			return "\\" + string(c)
@@ -35,49 +37,49 @@ func regexp_escape(c byte) string{
 }
 
 // Translate *nix like pattern. Ex: *.py to .*\.py for regexp
-func unix2regexp(pattern string) string{
+func unixRegexp(pattern string) string {
 	res := ""
 	for _, c := range pattern {
 		switch c {
-			default:
-				res = res + regexp_escape(byte(c))
-			case '*':
-				res = res + ".*"
-			case '?':
-				res = res + "."
+		default:
+			res = res + regexpEscape(byte(c))
+		case '*':
+			res = res + ".*"
+		case '?':
+			res = res + "."
 		}
 	}
 	return res
 }
 
-func print_file(file_info os.FileInfo) {
-	fmt.Printf("%s\n", file_info.Name())
+func printFile(fileinfo os.FileInfo) {
+	fmt.Printf("%s\n", fileinfo.Name())
 }
 
-func parse_dir(directory, pattern string){
-	regexp_pattern := ""
+func parseDir(directory, pattern string) {
+	regexpPattern := ""
 	if len(pattern) > 0 {
-		regexp_pattern = unix2regexp(pattern)
-		fmt.Println(regexp_pattern)
-	} else if len(*regexp_flag) > 0 {
-		regexp_pattern = *regexp_flag
+		regexpPattern = unixRegexp(pattern)
+		fmt.Println(regexpPattern)
+	} else if len(*regexpFlag) > 0 {
+		regexpPattern = *regexpFlag
 	}
-	if directory_fp, err := os.Open(directory); err == nil {
-		dir_info_slice, _ := directory_fp.Readdir(1024)
-		for _, file_info := range dir_info_slice {
-			file_name := file_info.Name()
-			matched, _ := regexp.Match(regexp_pattern, 
-						[]byte(file_name))
+	if dir, err := os.Open(directory); err == nil {
+		dirInfoSlice, _ := dir.Readdir(1024)
+		for _, fileinfo := range dirInfoSlice {
+			filename := fileinfo.Name()
+			matched, _ := regexp.Match(regexpPattern,
+				[]byte(filename))
 			if matched {
-				print_file(file_info)
+				printFile(fileinfo)
 			}
 		}
 	} else {
-		panic(fmt.Sprintf("Failed to open %s. Error: %s", directory, err))
-	} 
+		log.Fatal(err)
+	}
 }
 
-func find(){
+func find() {
 	pattern := ""
 	directory := "."
 
@@ -90,11 +92,11 @@ func find(){
 		directory = flag.Arg(1)
 	}
 	directory, _ = filepath.Abs(directory)
-	parse_dir(directory, pattern)
+	parseDir(directory, pattern)
 }
 
-func main(){
-	flag.Usage = show_usage
+func main() {
+	flag.Usage = showUsage
 	flag.Parse()
 	find()
 }
