@@ -132,3 +132,67 @@ func TestFindRandom(t *testing.T) {
 	}
 	t.Errorf("Expected %d levels but only got %d", levels, result)
 }
+
+
+func TestFindUnixPatternQue(t *testing.T) {
+	dir := createTempDir()
+	defer os.RemoveAll(dir)
+
+	os.Create(filepath.Join(dir, "foo"))
+	os.Create(filepath.Join(dir, "baar"))
+	os.Create(filepath.Join(dir, "food"))
+
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern": unixRegexp("fo?d"),
+		"directory": dir,
+	}, outputBuf)
+
+	expected := "food\n"
+	parts := strings.Split(outputBuf.String(), string(os.PathSeparator))
+	result := parts[len(parts) - 1]
+	if result != expected {
+		t.Errorf("Got %s expected %s", result, expected)
+	}
+}
+
+func TestFindUnixPatternStar(t *testing.T) {
+	dir := createTempDir()
+	defer os.RemoveAll(dir)
+
+	os.Create(filepath.Join(dir, "foo"))
+	os.Create(filepath.Join(dir, "baar"))
+	os.Create(filepath.Join(dir, "food"))
+
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern": unixRegexp("foo*"),
+		"directory": dir,
+	}, outputBuf)
+
+
+	output := outputBuf.String()
+	if !(strings.Contains(output, "foo\n") && 
+	     strings.Contains(output, "food\n")) {
+		t.Errorf("Didn't get foo and food")
+	}
+}
+
+func TestFindRegexp(t *testing.T) {
+	dir := createTempDir()
+	defer os.RemoveAll(dir)
+
+	os.Create(filepath.Join(dir, "faroo"))
+	os.Create(filepath.Join(dir, "bar"))
+	os.Create(filepath.Join(dir, "food"))
+
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern": "ar$",
+		"directory": dir,
+	}, outputBuf)
+
+	if !strings.Contains(outputBuf.String(), "bar\n") {
+		t.Errorf("Didn't get foo and food")
+	}
+}

@@ -96,7 +96,7 @@ func main() {
 	options["directory"] = "."
 
 	if flag.NArg() == 1 {
-		if regexpFlag != nil {
+		if *regexpFlag != "" {
 			options["pattern"] = *regexpFlag
 			options["directory"] = flag.Arg(0)
 		} else {
