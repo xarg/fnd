@@ -52,10 +52,10 @@ fnd -e <regexp> <path>
         $ fnd -e x$ # ends with x
         $ fnd -e ^x # starts with x
         ./dir1/x2
-        $ fnd -e y$ ./dir2 #search rgexp in a directory
+        $ fnd -e y$ ./dir2 #search regexp in a directory
         ./dir2/y
 
-Note: This is not a 1:1 implementation of find and I don't plan to make a complete find.
+Note: This is not a 1:1 implementation of find and I don't plan to make one.
 
 Possible features to come:
 
