@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -52,26 +53,42 @@ func unixRegexp(pattern string) string {
 	return res
 }
 
-func printFile(fileinfo os.FileInfo) {
-	fmt.Printf("%s\n", fileinfo.Name())
+func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
+	filename := filepath.Join(directory, fileinfo.Name())
+
+	if directory[0] != os.PathSeparator {
+		filename = "." + string(os.PathSeparator) + filename
+	}
+	fmt.Fprintf(stdout, "%s\n", filename)
 }
 
-func parseDir(directory, pattern string) {
+func parseDir(directory string, options map[string]string, stdout io.Writer) {
+	pattern := options["pattern"]
+
 	regexpPattern := ""
 	if len(pattern) > 0 {
 		regexpPattern = unixRegexp(pattern)
-		fmt.Println(regexpPattern)
 	} else if len(*regexpFlag) > 0 {
 		regexpPattern = *regexpFlag
 	}
+
 	if dir, err := os.Open(directory); err == nil {
-		dirInfoSlice, _ := dir.Readdir(1024)
-		for _, fileinfo := range dirInfoSlice {
-			filename := fileinfo.Name()
-			matched, _ := regexp.Match(regexpPattern,
-				[]byte(filename))
-			if matched {
-				printFile(fileinfo)
+		dirInfoSlice, _ := dir.Readdir(-1)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			for _, fileinfo := range dirInfoSlice {
+				filename := fileinfo.Name()
+				matched, _ := regexp.Match(regexpPattern,
+					[]byte(filename))
+				if matched {
+					printFile(directory, fileinfo, stdout)
+				}
+				if fileinfo.IsDir() {
+					parseDir(
+						filepath.Join(directory, filename),
+						options, stdout)
+				}
 			}
 		}
 	} else {
@@ -79,24 +96,27 @@ func parseDir(directory, pattern string) {
 	}
 }
 
-func find() {
-	pattern := ""
-	directory := "."
-
-	if flag.NArg() == 1 {
-		pattern = flag.Arg(0)
-	}
-
-	if flag.NArg() == 2 {
-		pattern = flag.Arg(0)
-		directory = flag.Arg(1)
-	}
-	directory, _ = filepath.Abs(directory)
-	parseDir(directory, pattern)
+func Find(options map[string]string, stdout io.Writer) {
+	parseDir(options["directory"], options, stdout)
 }
 
 func main() {
+	options := make(map[string]string)
+
 	flag.Usage = showUsage
 	flag.Parse()
-	find()
+
+	options["pattern"] = ""
+	options["directory"] = "."
+
+	if flag.NArg() == 1 {
+		options["pattern"] = flag.Arg(0)
+	}
+
+	if flag.NArg() == 2 {
+		options["pattern"] = flag.Arg(0)
+		options["directory"] = flag.Arg(1)
+	}
+
+	Find(options, os.Stdout)
 }

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,15 +48,20 @@ func createFiles(directory string, level, maxLevel int) {
 }
 
 //Create a random temporary directory with `levels` and return the absolute path
-//Note: you should clean the directory yourself
-func createTestDir(levels int) string {
+func createTestDirs(levels int) string {
+	targetDir := createTempDir()
+	createFiles(targetDir, 0, levels)
+	return targetDir
+}
+
+// just create a temp dir and return the absolute path
+// Note: you should clean the directory yourself
+func createTempDir() string {
 	defaultTmpDir := os.TempDir()
 	targetDir := filepath.Join(defaultTmpDir, randString(6))
 	if err := os.Mkdir(targetDir, 0777); err != nil {
 		log.Fatal(err)
 	}
-	// recurisvly create the rest of the dirs
-	createFiles(targetDir, 0, levels)
 	return targetDir
 }
 
@@ -75,9 +82,53 @@ func TestUnixRegexp(t *testing.T) {
 	}
 }
 
-func TestFind(t *testing.T) {
-	testDir := createTestDir(3)
+// try to create the directories
+func TestFindSimple(t *testing.T) {
+	dir := createTempDir()
+	defer os.RemoveAll(dir)
+
+	os.Create(filepath.Join(dir, "hello"))
+	os.Create(filepath.Join(dir, "world"))
+
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern":   "hell",
+		"directory": dir,
+	}, outputBuf)
+
+	expected := "hello"
+	result := outputBuf.Bytes()
+	if !bytes.Contains(result, []byte(expected)) {
+		t.Errorf("Got %s expected %s", result, expected)
+	}
+}
+
+func TestFindRandom(t *testing.T) {
+	levels := 3
+	testDir := createTestDirs(levels)
 	defer os.RemoveAll(testDir)
 
-	// go about my bussiness
+	// check if we really have 3 levels.
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern":   "",
+		"directory": testDir,
+	}, outputBuf)
+	lines := strings.Split(outputBuf.String(), "\n")
+
+	result := 0
+	for _, line := range lines {
+		slices := strings.Split(line, testDir)
+		if len(slices) > 1 {
+			parts := strings.Split(slices[1],
+				string(os.PathSeparator))
+			if len(parts) > result {
+				result = len(parts)
+			}
+			if len(parts) == levels { // we found enough levels
+				return
+			}
+		}
+	}
+	t.Errorf("Expected %d levels but only got %d", levels, result)
 }
