@@ -63,32 +63,18 @@ func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
 }
 
 func parseDir(directory string, options map[string]string, stdout io.Writer) {
-	pattern := options["pattern"]
-
-	regexpPattern := ""
-	if len(pattern) > 0 {
-		regexpPattern = unixRegexp(pattern)
-	} else if len(*regexpFlag) > 0 {
-		regexpPattern = *regexpFlag
-	}
-
 	if dir, err := os.Open(directory); err == nil {
 		dirInfoSlice, _ := dir.Readdir(-1)
-		if err != nil {
-			log.Fatal(err)
-		} else {
-			for _, fileinfo := range dirInfoSlice {
-				filename := fileinfo.Name()
-				matched, _ := regexp.Match(regexpPattern,
-					[]byte(filename))
-				if matched {
-					printFile(directory, fileinfo, stdout)
-				}
-				if fileinfo.IsDir() {
-					parseDir(
-						filepath.Join(directory, filename),
-						options, stdout)
-				}
+		for _, fileinfo := range dirInfoSlice {
+			filename := fileinfo.Name()
+			matched, _ := regexp.Match(options["pattern"], 
+				[]byte(filename))
+			if matched {
+				printFile(directory, fileinfo, stdout)
+			}
+			if fileinfo.IsDir() {
+				parseDir(filepath.Join(directory, filename),
+					options, stdout)
 			}
 		}
 	} else {
@@ -110,11 +96,16 @@ func main() {
 	options["directory"] = "."
 
 	if flag.NArg() == 1 {
-		options["pattern"] = flag.Arg(0)
+		if regexpFlag != nil {
+			options["pattern"] = *regexpFlag
+			options["directory"] = flag.Arg(0)
+		} else {
+			options["pattern"] = unixRegexp(flag.Arg(0))
+		}
 	}
 
 	if flag.NArg() == 2 {
-		options["pattern"] = flag.Arg(0)
+		options["pattern"] = unixRegexp(flag.Arg(0))
 		options["directory"] = flag.Arg(1)
 	}
 
