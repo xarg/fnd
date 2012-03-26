@@ -16,6 +16,7 @@ const alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
 var (
 	regexpFlag   = flag.String("e", "", "Use regexp")
 	filetypeFlag = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks")
+	caseSensitiveFlag = flag.Bool("s", false, "Case sensitive search")
 )
 
 func showUsage() {
@@ -94,6 +95,7 @@ func main() {
 
 	options["pattern"] = ""
 	options["directory"] = "."
+	options["caseSensitive"] = caseSensitiveFlag
 
 	if flag.NArg() == 1 {
 		if *regexpFlag != "" {
