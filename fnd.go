@@ -9,13 +9,14 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 const alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 var (
-	regexpFlag   = flag.String("e", "", "Use regexp")
-	filetypeFlag = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks")
+	regexpFlag        = flag.String("e", "", "Use regexp")
+	filetypeFlag      = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks")
 	caseSensitiveFlag = flag.Bool("s", false, "Case sensitive search")
 )
 
@@ -64,12 +65,18 @@ func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
 }
 
 func parseDir(directory string, options map[string]string, stdout io.Writer) {
+	pattern := options["pattern"]
+	if options["caseSensitive"] == "false" {
+		pattern = strings.ToLower(pattern)
+	}
 	if dir, err := os.Open(directory); err == nil {
 		dirInfoSlice, _ := dir.Readdir(-1)
 		for _, fileinfo := range dirInfoSlice {
 			filename := fileinfo.Name()
-			matched, _ := regexp.Match(options["pattern"], 
-				[]byte(filename))
+			if options["caseSensitive"] == "false" {
+				filename = strings.ToLower(filename)
+			}
+			matched, _ := regexp.Match(pattern, []byte(filename))
 			if matched {
 				printFile(directory, fileinfo, stdout)
 			}
@@ -95,18 +102,24 @@ func main() {
 
 	options["pattern"] = ""
 	options["directory"] = "."
-	options["caseSensitive"] = caseSensitiveFlag
+	options["caseSensitive"] = "false"
+	if *caseSensitiveFlag {
+		options["caseSensitive"] = "true"
+	}
 
 	if flag.NArg() == 1 {
-		if *regexpFlag != "" {
+		if *regexpFlag != "" { // fnd -e <regexp> <dir>
 			options["pattern"] = *regexpFlag
 			options["directory"] = flag.Arg(0)
-		} else {
+		} else { // fnd <pattern>
 			options["pattern"] = unixRegexp(flag.Arg(0))
 		}
 	}
 
-	if flag.NArg() == 2 {
+	if flag.NArg() == 2 { // fnd <pattern> <dir>
+		if *regexpFlag != "" {
+			log.Fatal("Can't use both regexp and pattern")
+		}
 		options["pattern"] = unixRegexp(flag.Arg(0))
 		options["directory"] = flag.Arg(1)
 	}

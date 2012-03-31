@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -133,7 +134,6 @@ func TestFindRandom(t *testing.T) {
 	t.Errorf("Expected %d levels but only got %d", levels, result)
 }
 
-
 func TestFindUnixPatternQue(t *testing.T) {
 	dir := createTempDir()
 	defer os.RemoveAll(dir)
@@ -144,13 +144,13 @@ func TestFindUnixPatternQue(t *testing.T) {
 
 	outputBuf := bytes.NewBufferString("")
 	Find(map[string]string{
-		"pattern": unixRegexp("fo?d"),
+		"pattern":   unixRegexp("fo?d"),
 		"directory": dir,
 	}, outputBuf)
 
 	expected := "food\n"
 	parts := strings.Split(outputBuf.String(), string(os.PathSeparator))
-	result := parts[len(parts) - 1]
+	result := parts[len(parts)-1]
 	if result != expected {
 		t.Errorf("Got %s expected %s", result, expected)
 	}
@@ -166,14 +166,13 @@ func TestFindUnixPatternStar(t *testing.T) {
 
 	outputBuf := bytes.NewBufferString("")
 	Find(map[string]string{
-		"pattern": unixRegexp("foo*"),
+		"pattern":   unixRegexp("foo*"),
 		"directory": dir,
 	}, outputBuf)
 
-
 	output := outputBuf.String()
-	if !(strings.Contains(output, "foo\n") && 
-	     strings.Contains(output, "food\n")) {
+	if !(strings.Contains(output, "foo\n") &&
+		strings.Contains(output, "food\n")) {
 		t.Errorf("Didn't get foo and food")
 	}
 }
@@ -188,11 +187,51 @@ func TestFindRegexp(t *testing.T) {
 
 	outputBuf := bytes.NewBufferString("")
 	Find(map[string]string{
-		"pattern": "ar$",
+		"pattern":   "ar$",
 		"directory": dir,
 	}, outputBuf)
 
 	if !strings.Contains(outputBuf.String(), "bar\n") {
 		t.Errorf("Didn't get foo and food")
 	}
+}
+
+func TestFindCaseSensitive(t *testing.T) {
+	dir := createTempDir()
+	defer os.RemoveAll(dir)
+
+	os.Create(filepath.Join(dir, "Foo"))
+	os.Create(filepath.Join(dir, "foo"))
+
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern":       "Foo",
+		"directory":     dir,
+		"caseSensitive": "true",
+	}, outputBuf)
+
+	output := outputBuf.String()
+	if !strings.Contains(output, "Foo") {
+		t.Errorf("Didn't find 'Foo' in %s", output)
+	}
+
+	if strings.Contains(output, "foo") {
+		t.Errorf("Shouldn't get 'foo' in %s", output)
+	}
+}
+
+func BenchmarkFind(b *testing.B) {
+	b.StopTimer()
+	fmt.Printf("Benchmarking with %d\n", b.N)
+
+	if b.N > 10000 {
+		return
+	}
+	dir := createTestDirs(b.N)
+	b.StartTimer()
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern":   "",
+		"directory": dir,
+	}, outputBuf)
 }
