@@ -220,6 +220,73 @@ func TestFindCaseSensitive(t *testing.T) {
 	}
 }
 
+// Find just files and directories
+func TestFindFileType(t *testing.T) {
+	dir := createTempDir()
+	defer os.RemoveAll(dir)
+
+	os.Create(filepath.Join(dir, "foo_file"))
+	os.Mkdir(filepath.Join(dir, "foo_dir"), 0777)
+
+	// Find just files and not dirs
+	outputBuf := bytes.NewBufferString("")
+	Find(map[string]string{
+		"pattern":       "foo",
+		"directory":     dir,
+		"filetype": "f",
+	}, outputBuf)
+
+	output := outputBuf.String()
+	if !strings.Contains(output, "foo_file") {
+		t.Errorf("Must contain 'foo_file' in %s", output)
+	}
+
+	if strings.Contains(output, "foo_dir") {
+		t.Errorf("Shouldn't contain 'foo_dir' in %s", output)
+	}
+
+	// Find just dirs and not files
+	outputBuf = bytes.NewBufferString("") // start with a new buffer
+	Find(map[string]string{
+		"pattern":       "foo",
+		"directory":     dir,
+		"filetype": "d",
+	}, outputBuf)
+
+	output = outputBuf.String()
+	if !strings.Contains(output, "foo_dir") {
+		t.Errorf("Must contain 'foo_dir' in %s", output)
+	}
+
+	if strings.Contains(output, "foo_file") {
+		t.Errorf("Shouldn't contain 'foo_file' in %s", output)
+	}
+
+
+	// Find both files and directories
+	outputBuf = bytes.NewBufferString("") // start with a new buffer
+	Find(map[string]string{
+		"pattern":       "foo",
+		"directory":     dir,
+		"filetype": "f,d",
+	}, outputBuf)
+
+	output = outputBuf.String()
+	if !strings.Contains(output, "foo_dir") {
+		t.Errorf("Must contain 'foo_dir' in %s", output)
+	}
+
+	if !strings.Contains(output, "foo_file") {
+		t.Errorf("Must contain 'foo_file' in %s", output)
+	}
+}
+
+
+func TestFindFileTypeSymLink(t *testing.T) {
+
+}
+
+
 func BenchmarkFind(b *testing.B) {
 	b.StopTimer()
 	fmt.Printf("Benchmarking with %d\n", b.N)

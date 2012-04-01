@@ -16,7 +16,7 @@ const alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
 
 var (
 	regexpFlag        = flag.String("e", "", "Use regexp")
-	filetypeFlag      = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks")
+	filetypeFlag      = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks. Comma separated.")
 	caseSensitiveFlag = flag.Bool("s", false, "Case sensitive search")
 )
 
@@ -65,10 +65,6 @@ func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
 }
 
 func parseDir(directory string, options map[string]string, stdout io.Writer) {
-	pattern := options["pattern"]
-	if options["caseSensitive"] == "false" {
-		pattern = strings.ToLower(pattern)
-	}
 	if dir, err := os.Open(directory); err == nil {
 		dirInfoSlice, _ := dir.Readdir(-1)
 		for _, fileinfo := range dirInfoSlice {
@@ -76,9 +72,26 @@ func parseDir(directory string, options map[string]string, stdout io.Writer) {
 			if options["caseSensitive"] == "false" {
 				filename = strings.ToLower(filename)
 			}
-			matched, _ := regexp.Match(pattern, []byte(filename))
-			if matched {
-				printFile(directory, fileinfo, stdout)
+			ok := false
+			if options["filetype"] != "all"{
+				if options["filetype_f"] == "true" && !fileinfo.IsDir() && fileinfo.Mode() != os.ModeSymlink {
+					ok = true
+				}
+				if options["filetype_d"] == "true" && fileinfo.IsDir() {
+					ok = true
+				}
+				if options["filetype_l"] == "true" && fileinfo.Mode() == os.ModeSymlink {
+					ok = true
+				}
+			} else {
+				ok = true
+			}
+			if ok {
+				matched, _ := regexp.Match(options["pattern"],
+					[]byte(filename))
+				if matched {
+					printFile(directory, fileinfo, stdout)
+				}
 			}
 			if fileinfo.IsDir() {
 				parseDir(filepath.Join(directory, filename),
@@ -91,6 +104,21 @@ func parseDir(directory string, options map[string]string, stdout io.Writer) {
 }
 
 func Find(options map[string]string, stdout io.Writer) {
+	if options["caseSensitive"] == "false" {
+		options["pattern"] = strings.ToLower(options["pattern"])
+	}
+	options["filetype_f"] = "false"
+	options["filetype_d"] = "false"
+	options["filetype_l"] = "false"
+
+	if options["filetype"] == "" { // just in case we don't have any option
+		options["filetype"] = "all"
+	}
+	if options["filetype"] != "all" {
+		for _, filetype := range strings.Split(options["filetype"], ",") {
+			options["filetype_" + filetype] = "true"
+		}
+	}
 	parseDir(options["directory"], options, stdout)
 }
 
@@ -106,6 +134,7 @@ func main() {
 	if *caseSensitiveFlag {
 		options["caseSensitive"] = "true"
 	}
+	options["filetype"] = *filetypeFlag
 
 	if flag.NArg() == 1 {
 		if *regexpFlag != "" { // fnd -e <regexp> <dir>

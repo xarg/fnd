@@ -64,5 +64,4 @@ Possible features to come:
 * optional depth
 * conditionals like: -or -and
 * configuration file.
-* add case insensitive -i ?
 
