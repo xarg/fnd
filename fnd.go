@@ -99,7 +99,7 @@ func parseDir(directory string, options map[string]string, stdout io.Writer) {
 			}
 		}
 	} else {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
