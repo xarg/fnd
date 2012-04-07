@@ -73,7 +73,7 @@ func parseDir(directory string, options map[string]string, stdout io.Writer) {
 				filename = strings.ToLower(filename)
 			}
 			ok := false
-			if options["filetype"] != "all"{
+			if options["filetype"] != "all" {
 				if options["filetype_f"] == "true" && !fileinfo.IsDir() && fileinfo.Mode() != os.ModeSymlink {
 					ok = true
 				}
@@ -116,7 +116,7 @@ func Find(options map[string]string, stdout io.Writer) {
 	}
 	if options["filetype"] != "all" {
 		for _, filetype := range strings.Split(options["filetype"], ",") {
-			options["filetype_" + filetype] = "true"
+			options["filetype_"+filetype] = "true"
 		}
 	}
 	parseDir(options["directory"], options, stdout)

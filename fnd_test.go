@@ -231,9 +231,9 @@ func TestFindFileType(t *testing.T) {
 	// Find just files and not dirs
 	outputBuf := bytes.NewBufferString("")
 	Find(map[string]string{
-		"pattern":       "foo",
-		"directory":     dir,
-		"filetype": "f",
+		"pattern":   "foo",
+		"directory": dir,
+		"filetype":  "f",
 	}, outputBuf)
 
 	output := outputBuf.String()
@@ -248,9 +248,9 @@ func TestFindFileType(t *testing.T) {
 	// Find just dirs and not files
 	outputBuf = bytes.NewBufferString("") // start with a new buffer
 	Find(map[string]string{
-		"pattern":       "foo",
-		"directory":     dir,
-		"filetype": "d",
+		"pattern":   "foo",
+		"directory": dir,
+		"filetype":  "d",
 	}, outputBuf)
 
 	output = outputBuf.String()
@@ -262,13 +262,12 @@ func TestFindFileType(t *testing.T) {
 		t.Errorf("Shouldn't contain 'foo_file' in %s", output)
 	}
 
-
 	// Find both files and directories
 	outputBuf = bytes.NewBufferString("") // start with a new buffer
 	Find(map[string]string{
-		"pattern":       "foo",
-		"directory":     dir,
-		"filetype": "f,d",
+		"pattern":   "foo",
+		"directory": dir,
+		"filetype":  "f,d",
 	}, outputBuf)
 
 	output = outputBuf.String()
@@ -281,11 +280,9 @@ func TestFindFileType(t *testing.T) {
 	}
 }
 
-
 func TestFindFileTypeSymLink(t *testing.T) {
 
 }
-
 
 func BenchmarkFind(b *testing.B) {
 	b.StopTimer()
