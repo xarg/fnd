@@ -65,41 +65,43 @@ func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
 }
 
 func parseDir(directory string, options map[string]string, stdout io.Writer) {
-	if dir, err := os.Open(directory); err == nil {
-		dirInfoSlice, _ := dir.Readdir(-1)
-		for _, fileinfo := range dirInfoSlice {
-			filename := fileinfo.Name()
-			if options["caseSensitive"] == "false" {
-				filename = strings.ToLower(filename)
-			}
-			ok := false
-			if options["filetype"] != "all" {
-				if options["filetype_f"] == "true" && !fileinfo.IsDir() && fileinfo.Mode() != os.ModeSymlink {
-					ok = true
-				}
-				if options["filetype_d"] == "true" && fileinfo.IsDir() {
-					ok = true
-				}
-				if options["filetype_l"] == "true" && fileinfo.Mode() == os.ModeSymlink {
-					ok = true
-				}
-			} else {
+	dir, err := os.Open(directory)
+	if err != nil { // can't open? just ignore it
+		return 
+	}
+
+	// this reads the whole content of the dir. It may not be a good idea.
+	dirInfoSlice, _ := dir.Readdir(-1)
+	for _, fileinfo := range dirInfoSlice {
+		filename := fileinfo.Name()
+		if options["caseSensitive"] == "false" {
+			filename = strings.ToLower(filename)
+		}
+		ok := false
+		if options["filetype"] != "all" {
+			if options["filetype_f"] == "true" && !fileinfo.IsDir() && fileinfo.Mode() != os.ModeSymlink {
 				ok = true
 			}
-			if ok {
-				matched, _ := regexp.Match(options["pattern"],
-					[]byte(filename))
-				if matched {
-					printFile(directory, fileinfo, stdout)
-				}
+			if options["filetype_d"] == "true" && fileinfo.IsDir() {
+				ok = true
 			}
-			if fileinfo.IsDir() {
-				parseDir(filepath.Join(directory, filename),
-					options, stdout)
+			if options["filetype_l"] == "true" && fileinfo.Mode() == os.ModeSymlink {
+				ok = true
+			}
+		} else {
+			ok = true
+		}
+		if ok {
+			matched, _ := regexp.Match(options["pattern"],
+				[]byte(filename))
+			if matched {
+				printFile(directory, fileinfo, stdout)
 			}
 		}
-	} else {
-		log.Println(err)
+		if fileinfo.IsDir() {
+			parseDir(filepath.Join(directory, filename),
+				options, stdout)
+		}
 	}
 }
 
