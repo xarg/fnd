@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"bufio"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,12 +13,16 @@ import (
 	"strings"
 )
 
-const alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const (
+	alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	cacheDirname = "fnd.cache"
+)
 
 var (
 	regexpFlag        = flag.String("e", "", "Use regexp")
 	filetypeFlag      = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks. Comma separated.")
 	caseSensitiveFlag = flag.Bool("s", false, "Case sensitive search")
+	cacheFlag         = flag.Bool("c", false, "Use cache")
 )
 
 func showUsage() {
@@ -60,13 +65,22 @@ func unixRegexp(pattern string) string {
 	return res
 }
 
-func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
-	filename := filepath.Join(directory, fileinfo.Name())
+// print the filename, take format into consideration
+func printFile(directory string, filename string, stdout io.Writer) {
+	filename = filepath.Join(directory, filename)
 
 	if directory[0] != os.PathSeparator {
 		filename = "." + string(os.PathSeparator) + filename
 	}
 	fmt.Fprintf(stdout, "%s\n", filename)
+}
+
+// If we matched the pattern to a file, then print that filename
+func printIfMached(options map[string]string, directory string, filename string, stdout io.Writer) {
+	matched, _ := regexp.Match(options["pattern"], []byte(filename))
+	if matched {
+		printFile(directory, filename, stdout)
+	}
 }
 
 func parseDir(directory string, options map[string]string, stdout io.Writer) {
@@ -97,17 +111,78 @@ func parseDir(directory string, options map[string]string, stdout io.Writer) {
 			ok = true
 		}
 		if ok {
-			matched, _ := regexp.Match(options["pattern"],
-				[]byte(filename))
-			if matched {
-				printFile(directory, fileinfo, stdout)
-			}
+			filename := filepath.Join(directory, fileinfo.Name())
+			printIfMached(options, directory, filename, stdout)
 		}
 		if fileinfo.IsDir() {
 			parseDir(filepath.Join(directory, filename),
 				options, stdout)
 		}
 	}
+}
+
+// For a given dirname and a list of filenames write to the cache
+func setCache(dirname string, filenames [][]byte) {
+	cacheDir := filepath.Join(os.TempDir(), cacheDirname)
+	// create if does not exist
+	if fi, err := os.Stat(cacheDir); fi == nil && err != nil {
+		if err := os.Mkdir(cacheDir, 0777); err != nil {
+			log.Println(err) // just warn the user; no cache will be used.
+			return
+		}
+	}
+	cacheFilename := filepath.Join(cacheDir, dirname)
+	if fd, err := os.Create(cacheFilename); err != nil{
+		defer fd.Close()
+		if err != nil {
+			log.Println(err) // just warn the user; no cache will be used.
+			return
+		}
+		for _, filename := range filenames {
+			// write: /path/to/file/file_1
+			fmt.Fprint(fd, filename) // this can fail silently?
+		}
+	}
+
+}
+// Read a whole file into the memory and store it as array of lines
+func readLines(path string) (lines []string, err error) {
+    var (
+        file *os.File
+        part []byte
+        prefix bool
+    )
+    if file, err = os.Open(path); err != nil {
+        return
+    }
+    defer file.Close()
+
+    reader := bufio.NewReader(file)
+    buffer := bytes.NewBuffer(make([]byte, 1024))
+    for {
+        if part, prefix, err = reader.ReadLine(); err != nil {
+            break
+        }
+        buffer.Write(part)
+        if !prefix {
+            lines = append(lines, buffer.String())
+            buffer.Reset()
+        }
+    }
+    if err == io.EOF {
+        err = nil
+    }
+    return
+}
+
+// This will try to read the cache of a certain directory. 
+// If we have it and it's old just delete the cache.
+func getCache(dirname string) []string {
+	cacheFilename := filepath.Join(os.TempDir(), cacheDirname, dirname)
+	if lines, err := readLines(cacheFilename); err == nil{
+		return lines
+	}
+	return nil
 }
 
 func Find(options map[string]string, stdout io.Writer) {
@@ -126,6 +201,15 @@ func Find(options map[string]string, stdout io.Writer) {
 			options["filetype_"+filetype] = "true"
 		}
 	}
+	if options["cache"] == "true" {
+		items := getCache(options["directory"])
+		if items != nil {
+			for _, filename := range items {
+				printIfMached(options, options["directory"], filename, stdout)
+			}
+			return // no need to parse the dir again
+		}
+	}
 	parseDir(options["directory"], options, stdout)
 }
 
@@ -138,9 +222,16 @@ func main() {
 	options["pattern"] = ""
 	options["directory"] = "."
 	options["caseSensitive"] = "false"
+	options["cache"] = "false"
+
 	if *caseSensitiveFlag {
 		options["caseSensitive"] = "true"
 	}
+
+	if *cacheFlag {
+		options["cache"] = "true"
+	}
+
 	options["filetype"] = *filetypeFlag
 
 	if flag.NArg() == 1 {
