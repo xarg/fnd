@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -30,7 +29,7 @@ func createFiles(directory string, level, maxLevel int) {
 		return
 	}
 
-	for i := 0; i < rand.Intn(100); i++ {
+	for i := 0; i < rand.Intn(20); i++ {
 		filename := filepath.Join(directory, randString(6))
 		if rand.Intn(2) == 0 { //create a file
 			fd, err := os.Create(filename)
@@ -285,17 +284,12 @@ func TestFindFileTypeSymLink(t *testing.T) {
 }
 
 func BenchmarkFind(b *testing.B) {
-	b.StopTimer()
-	fmt.Printf("Benchmarking with %d\n", b.N)
+	testDir := createTestDirs(10)
+	defer os.RemoveAll(testDir)
 
-	if b.N > 10000 {
-		return
-	}
-	dir := createTestDirs(b.N)
-	b.StartTimer()
 	outputBuf := bytes.NewBufferString("")
 	Find(map[string]string{
 		"pattern":   "",
-		"directory": dir,
+		"directory": testDir,
 	}, outputBuf)
 }

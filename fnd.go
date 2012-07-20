@@ -27,6 +27,11 @@ func showUsage() {
 	flag.PrintDefaults()
 }
 
+func readConfigFile(filePath string) map[string]string {
+	var result map[string]string
+	return result
+}
+
 //escape alpha numeric patterns
 func regexpEscape(c byte) string {
 	if bytes.IndexByte([]byte(alphaNum), c) == -1 {
@@ -67,7 +72,7 @@ func printFile(directory string, fileinfo os.FileInfo, stdout io.Writer) {
 func parseDir(directory string, options map[string]string, stdout io.Writer) {
 	dir, err := os.Open(directory)
 	if err != nil { // can't open? just ignore it
-		return 
+		return
 	}
 
 	// this reads the whole content of the dir. It may not be a good idea.
