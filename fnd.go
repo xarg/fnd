@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	"io"
-	"bufio"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	alphaNum = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	alphaNum     = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	cacheDirname = "fnd.cache"
 )
 
@@ -65,6 +66,12 @@ func unixRegexp(pattern string) string {
 	return res
 }
 
+func sha1Hex(str string) string {
+	dirHash := sha1.New()
+	io.WriteString(dirHash, str)
+	return fmt.Sprintf("%x", dirHash.Sum(nil))
+}
+
 // print the filename, take format into consideration
 func printFile(directory string, filename string, stdout io.Writer) {
 	filename = filepath.Join(directory, filename)
@@ -83,7 +90,7 @@ func printIfMached(options map[string]string, directory string, filename string,
 	}
 }
 
-func parseDir(directory string, options map[string]string, stdout io.Writer) {
+func parseDir(options map[string]string, directory string, stdout io.Writer, cacheChan chan []byte) {
 	dir, err := os.Open(directory)
 	if err != nil { // can't open? just ignore it
 		return
@@ -111,18 +118,19 @@ func parseDir(directory string, options map[string]string, stdout io.Writer) {
 			ok = true
 		}
 		if ok {
-			filename := filepath.Join(directory, fileinfo.Name())
+			filename := fileinfo.Name()
+			cacheChan <- []byte(filename) // send to cache
 			printIfMached(options, directory, filename, stdout)
 		}
 		if fileinfo.IsDir() {
-			parseDir(filepath.Join(directory, filename),
-				options, stdout)
+			parseDir(options, filepath.Join(directory, filename),
+				stdout, cacheChan)
 		}
 	}
 }
 
 // For a given dirname and a list of filenames write to the cache
-func setCache(dirname string, filenames [][]byte) {
+func setCache(dirname string, cacheChan chan []byte) {
 	cacheDir := filepath.Join(os.TempDir(), cacheDirname)
 	// create if does not exist
 	if fi, err := os.Stat(cacheDir); fi == nil && err != nil {
@@ -131,58 +139,61 @@ func setCache(dirname string, filenames [][]byte) {
 			return
 		}
 	}
-	cacheFilename := filepath.Join(cacheDir, dirname)
-	if fd, err := os.Create(cacheFilename); err != nil{
+	cacheFilename := filepath.Join(cacheDir, sha1Hex(dirname))
+	if fd, err := os.Create(cacheFilename); err == nil {
 		defer fd.Close()
 		if err != nil {
 			log.Println(err) // just warn the user; no cache will be used.
 			return
 		}
-		for _, filename := range filenames {
-			// write: /path/to/file/file_1
-			fmt.Fprint(fd, filename) // this can fail silently?
+		for filename := range cacheChan {
+			fd.Write(append(filename, byte('\n')))
 		}
 	}
-
 }
+
 // Read a whole file into the memory and store it as array of lines
 func readLines(path string) (lines []string, err error) {
-    var (
-        file *os.File
-        part []byte
-        prefix bool
-    )
-    if file, err = os.Open(path); err != nil {
-        return
-    }
-    defer file.Close()
+	var (
+		file   *os.File
+		part   []byte
+		prefix bool
+	)
+	if file, err = os.Open(path); err != nil {
+		return
+	}
+	defer file.Close()
 
-    reader := bufio.NewReader(file)
-    buffer := bytes.NewBuffer(make([]byte, 1024))
-    for {
-        if part, prefix, err = reader.ReadLine(); err != nil {
-            break
-        }
-        buffer.Write(part)
-        if !prefix {
-            lines = append(lines, buffer.String())
-            buffer.Reset()
-        }
-    }
-    if err == io.EOF {
-        err = nil
-    }
-    return
+	reader := bufio.NewReader(file)
+	buffer := bytes.NewBuffer(make([]byte, 1024))
+	for {
+		if part, prefix, err = reader.ReadLine(); err != nil {
+			break
+		}
+		buffer.Write(part)
+		if !prefix {
+			lines = append(lines, buffer.String())
+			buffer.Reset()
+		}
+	}
+	if err == io.EOF {
+		err = nil
+	}
+	return
 }
 
 // This will try to read the cache of a certain directory. 
 // If we have it and it's old just delete the cache.
-func getCache(dirname string) []string {
-	cacheFilename := filepath.Join(os.TempDir(), cacheDirname, dirname)
-	if lines, err := readLines(cacheFilename); err == nil{
-		return lines
+func printCache(options map[string]string, dirname string, stdout io.Writer) {
+	cacheDir := filepath.Join(os.TempDir(), cacheDirname)
+	cacheFilename := filepath.Join(cacheDir, sha1Hex(dirname))
+	if lines, err := readLines(cacheFilename); err == nil {
+		for _, filename := range lines {
+			printIfMached(options, dirname, filename, stdout)
+		}
+	} else {
+		log.Println(err) // just warn the user; no cache will be used.
 	}
-	return nil
 }
 
 func Find(options map[string]string, stdout io.Writer) {
@@ -202,15 +213,13 @@ func Find(options map[string]string, stdout io.Writer) {
 		}
 	}
 	if options["cache"] == "true" {
-		items := getCache(options["directory"])
-		if items != nil {
-			for _, filename := range items {
-				printIfMached(options, options["directory"], filename, stdout)
-			}
-			return // no need to parse the dir again
-		}
+		printCache(options, options["directory"], stdout)
+		return // no need to parse the dir again
 	}
-	parseDir(options["directory"], options, stdout)
+	cacheChan := make(chan []byte, 1024)
+	// Run a goroutine for writing the cache
+	go setCache(options["directory"], cacheChan)
+	parseDir(options, options["directory"], stdout, cacheChan)
 }
 
 func main() {
