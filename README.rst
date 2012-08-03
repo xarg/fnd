@@ -68,37 +68,59 @@ Testing
 ++++++++++
 
 ::
-        $ go test
+
+        $ go test -v
+        === RUN TestUnixRegexp
+        --- PASS: TestUnixRegexp (0.00 seconds)
+        === RUN TestFindSimple
+        --- PASS: TestFindSimple (0.00 seconds)
+        === RUN TestFindLevels
+        --- PASS: TestFindLevels (0.05 seconds)
+        === RUN TestFindUnixPatternQue
+        --- PASS: TestFindUnixPatternQue (0.00 seconds)
+        === RUN TestFindUnixPatternStar
+        --- PASS: TestFindUnixPatternStar (0.00 seconds)
+        === RUN TestFindRegexp
+        --- PASS: TestFindRegexp (0.00 seconds)
+        === RUN TestFindCaseSensitive
+        --- PASS: TestFindCaseSensitive (0.00 seconds)
+        === RUN TestFindFileType
+        --- PASS: TestFindFileType (0.05 seconds)
+        === RUN TestFindFileTypeSymLink
+        --- PASS: TestFindFileTypeSymLink (0.00 seconds)
         PASS
-        ok      ~/fnd        0.073s
+        ok  fnd  0.110s
 
 
 Benchmarking
 ------------------------
 
 ::
-        $ go test -c -test.bench="." -test.cpuprofile="fnd_cpu.prof" -test.memprofile="fnd_mem.prof"
+
+        $ go test -c # this creates fnd.test. This step is required in order to use it with the profiler.
+        $ ./fnd.test -test.bench="." -test.cpuprofile="fnd_cpu.prof" -test.memprofile="fnd_mem.prof"
+        PASS
+        BenchmarkFind	   50000	     36418 ns/op
         $ go tool pprof fnd.test fnd_cpu.prof
         Welcome to pprof!  For help, type 'help'.
-        (pprof) top10 
-        Total: 137 samples
-             124  90.5%  90.5%      124  90.5% runtime.sigprocmask
-              10   7.3%  97.8%       10   7.3% runtime.nanotime
-               1   0.7%  98.5%        1   0.7% MCentral_Free
-               1   0.7%  99.3%        1   0.7% MHeap_AllocLocked
-               1   0.7% 100.0%        1   0.7% runtime.memmove
-               0   0.0% 100.0%        1   0.7% MCentral_Grow
-               0   0.0% 100.0%        1   0.7% ReleaseN
-               0   0.0% 100.0%       58  42.3% fnd.BenchmarkFind
-               0   0.0% 100.0%       22  16.1% fnd.Find
-               0   0.0% 100.0%       58  42.3% fnd.createFiles
-
+        (pprof) top10
+        Total: 93 samples
+             32  34.4%  34.4%       42  45.2% runtime.FixAlloc_Free
+             29  31.2%  65.6%       93 100.0% fmt.Fprintln
+              6   6.5%  72.0%       19  20.4% runtime.MHeap_Alloc
+              5   5.4%  77.4%       12  12.9% path/filepath.Clean
+              3   3.2%  80.6%        9   9.7% runtime.MCache_Free
+              3   3.2%  83.9%        6   6.5% runtime.MCentral_FreeList
+              2   2.2%  86.0%        2   2.2% fmt.(*fmt).pad
+              2   2.2%  88.2%       22  23.7% runtime.MGetSizeClassInfo
+              2   2.2%  90.3%        9   9.7% runtime.isNaN
+              1   1.1%  91.4%        1   1.1% flag.(*FlagSet).Parse
 
 Possible features to come:
+---------------------------------
 
-* cache
-* date search
 * match terminal highlighting
+* date search
 * optional depth
 * conditionals like: -or -and
 * configuration file.

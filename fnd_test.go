@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var benchmarkTestDir = ""
+
 func randString(length int) string {
 	now := time.Now()
 	rand.Seed(now.UnixNano())
@@ -29,18 +31,13 @@ func createFiles(directory string, level, maxLevel int) {
 		return
 	}
 
-	for i := 0; i < rand.Intn(20); i++ {
+	// create 5 directories and 5 files on this level
+	for i := 0; i <= 10; i++ {
 		filename := filepath.Join(directory, randString(6))
-		if rand.Intn(2) == 0 { //create a file
-			fd, err := os.Create(filename)
-			if err != nil {
-				log.Fatal(err)
-			}
-			fd.Close()
+		if i % 2 == 0 { //create a file
+			os.Create(filename)
 		} else { //create a directory
-			if err := os.Mkdir(filename, 0777); err != nil {
-				log.Fatal(err)
-			} else {
+			if err := os.Mkdir(filename, 0777); err == nil {
 				createFiles(filename, level+1, maxLevel)
 			}
 		}
@@ -103,7 +100,7 @@ func TestFindSimple(t *testing.T) {
 	}
 }
 
-func TestFindRandom(t *testing.T) {
+func TestFindLevels(t *testing.T) {
 	levels := 3
 	testDir := createTestDirs(levels)
 	defer os.RemoveAll(testDir)
@@ -133,6 +130,7 @@ func TestFindRandom(t *testing.T) {
 	t.Errorf("Expected %d levels but only got %d", levels, result)
 }
 
+// find using the unix question mark pattern
 func TestFindUnixPatternQue(t *testing.T) {
 	dir := createTempDir()
 	defer os.RemoveAll(dir)
@@ -155,6 +153,7 @@ func TestFindUnixPatternQue(t *testing.T) {
 	}
 }
 
+// find using the * unix pattern
 func TestFindUnixPatternStar(t *testing.T) {
 	dir := createTempDir()
 	defer os.RemoveAll(dir)
@@ -279,17 +278,27 @@ func TestFindFileType(t *testing.T) {
 	}
 }
 
+//Not sure yet how to detect symlinks?
 func TestFindFileTypeSymLink(t *testing.T) {
 
 }
 
 func BenchmarkFind(b *testing.B) {
-	testDir := createTestDirs(10)
-	defer os.RemoveAll(testDir)
-
+	defer os.RemoveAll(benchmarkTestDir)
 	outputBuf := bytes.NewBufferString("")
-	Find(map[string]string{
-		"pattern":   "",
-		"directory": testDir,
-	}, outputBuf)
+
+	for i:=0; i<=b.N; i++ {
+		//this will find all the files
+		Find(map[string]string{
+			"pattern":   "",
+			"directory": benchmarkTestDir,
+		}, outputBuf)
+		outputBuf.Reset()
+	}
+
+}
+
+// this is executed only once. We don't want to influence the benchmark with the creation of the directories
+func init(){
+	benchmarkTestDir = createTestDirs(3) // this will create 10^3 directories and files.
 }
