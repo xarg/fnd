@@ -34,7 +34,7 @@ func createFiles(directory string, level, maxLevel int) {
 	// create 5 directories and 5 files on this level
 	for i := 0; i <= 10; i++ {
 		filename := filepath.Join(directory, randString(6))
-		if i % 2 == 0 { //create a file
+		if i%2 == 0 { //create a file
 			os.Create(filename)
 		} else { //create a directory
 			if err := os.Mkdir(filename, 0777); err == nil {
@@ -287,7 +287,7 @@ func BenchmarkFind(b *testing.B) {
 	defer os.RemoveAll(benchmarkTestDir)
 	outputBuf := bytes.NewBufferString("")
 
-	for i:=0; i<=b.N; i++ {
+	for i := 0; i <= b.N; i++ {
 		//this will find all the files
 		Find(map[string]string{
 			"pattern":   "",
@@ -299,6 +299,6 @@ func BenchmarkFind(b *testing.B) {
 }
 
 // this is executed only once. We don't want to influence the benchmark with the creation of the directories
-func init(){
+func init() {
 	benchmarkTestDir = createTestDirs(3) // this will create 10^3 directories and files.
 }
