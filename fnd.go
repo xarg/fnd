@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha1"
 	"flag"
 	"fmt"
 	"io"
@@ -16,14 +15,12 @@ import (
 
 const (
 	alphaNum     = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	cacheDirname = "fnd.cache"
 )
 
 var (
 	regexpFlag        = flag.String("e", "", "Use regexp")
 	filetypeFlag      = flag.String("type", "all", "Search only (f)iles, (d)irectories or (l)inks. Comma separated.")
 	caseSensitiveFlag = flag.Bool("s", false, "Case sensitive search")
-	cacheFlag         = flag.Bool("c", false, "Use cache")
 )
 
 func showUsage() {
@@ -66,12 +63,6 @@ func unixRegexp(pattern string) string {
 	return res
 }
 
-func sha1Hex(str string) string {
-	dirHash := sha1.New()
-	io.WriteString(dirHash, str)
-	return fmt.Sprintf("%x", dirHash.Sum(nil))
-}
-
 // print the filename, take format into consideration
 func printFile(directory string, filename string, stdout io.Writer) {
 	filename = filepath.Join(directory, filename)
@@ -90,7 +81,7 @@ func printIfMached(options map[string]string, directory string, filename string,
 	}
 }
 
-func parseDir(options map[string]string, directory string, stdout io.Writer, cacheChan chan []byte) {
+func parseDir(options map[string]string, directory string, stdout io.Writer) {
 	dir, err := os.Open(directory)
 	if err != nil { // can't open? just ignore it
 		return
@@ -119,35 +110,11 @@ func parseDir(options map[string]string, directory string, stdout io.Writer, cac
 		}
 		if ok {
 			filename := fileinfo.Name()
-			cacheChan <- []byte(filename) // send to cache
 			printIfMached(options, directory, filename, stdout)
 		}
 		if fileinfo.IsDir() {
 			parseDir(options, filepath.Join(directory, filename),
-				stdout, cacheChan)
-		}
-	}
-}
-
-// For a given dirname and a list of filenames write to the cache
-func setCache(dirname string, cacheChan chan []byte) {
-	cacheDir := filepath.Join(os.TempDir(), cacheDirname)
-	// create if does not exist
-	if fi, err := os.Stat(cacheDir); fi == nil && err != nil {
-		if err := os.Mkdir(cacheDir, 0777); err != nil {
-			log.Println(err) // just warn the user; no cache will be used.
-			return
-		}
-	}
-	cacheFilename := filepath.Join(cacheDir, sha1Hex(dirname))
-	if fd, err := os.Create(cacheFilename); err == nil {
-		defer fd.Close()
-		if err != nil {
-			log.Println(err) // just warn the user; no cache will be used.
-			return
-		}
-		for filename := range cacheChan {
-			fd.Write(append(filename, byte('\n')))
+				stdout)
 		}
 	}
 }
@@ -182,20 +149,6 @@ func readLines(path string) (lines []string, err error) {
 	return
 }
 
-// This will try to read the cache of a certain directory. 
-// If we have it and it's old just delete the cache.
-func printCache(options map[string]string, dirname string, stdout io.Writer) {
-	cacheDir := filepath.Join(os.TempDir(), cacheDirname)
-	cacheFilename := filepath.Join(cacheDir, sha1Hex(dirname))
-	if lines, err := readLines(cacheFilename); err == nil {
-		for _, filename := range lines {
-			printIfMached(options, dirname, filename, stdout)
-		}
-	} else {
-		log.Println(err) // just warn the user; no cache will be used.
-	}
-}
-
 func Find(options map[string]string, stdout io.Writer) {
 	if options["caseSensitive"] == "false" {
 		options["pattern"] = strings.ToLower(options["pattern"])
@@ -212,14 +165,7 @@ func Find(options map[string]string, stdout io.Writer) {
 			options["filetype_"+filetype] = "true"
 		}
 	}
-	if options["cache"] == "true" {
-		printCache(options, options["directory"], stdout)
-		return // no need to parse the dir again
-	}
-	cacheChan := make(chan []byte, 1024)
-	// Run a goroutine for writing the cache
-	go setCache(options["directory"], cacheChan)
-	parseDir(options, options["directory"], stdout, cacheChan)
+	parseDir(options, options["directory"], stdout)
 }
 
 func main() {
@@ -231,14 +177,9 @@ func main() {
 	options["pattern"] = ""
 	options["directory"] = "."
 	options["caseSensitive"] = "false"
-	options["cache"] = "false"
 
 	if *caseSensitiveFlag {
 		options["caseSensitive"] = "true"
-	}
-
-	if *cacheFlag {
-		options["cache"] = "true"
 	}
 
 	options["filetype"] = *filetypeFlag
