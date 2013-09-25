@@ -64,24 +64,24 @@ func unixRegexp(pattern string) string {
 }
 
 // print the filename, take format into consideration
-func printFile(directory string, filename string, stdout io.Writer) {
+func printFile(directory string, filename string, outChan chan string) {
 	filename = filepath.Join(directory, filename)
 
 	if directory[0] != os.PathSeparator {
 		filename = "." + string(os.PathSeparator) + filename
 	}
-	fmt.Fprintf(stdout, "%s\n", filename)
+	outChan <- fmt.Sprintf("%s\n", filename)
 }
 
 // If we matched the pattern to a file, then print that filename
-func printIfMached(options map[string]string, directory string, filename string, stdout io.Writer) {
+func printIfMached(options map[string]string, directory string, filename string, outChan chan string) {
 	matched, _ := regexp.Match(options["pattern"], []byte(filename))
 	if matched {
-		printFile(directory, filename, stdout)
+		printFile(directory, filename, outChan)
 	}
 }
 
-func parseDir(options map[string]string, directory string, stdout io.Writer) {
+func parseDir(options map[string]string, directory string, outChan chan string) {
 	dir, err := os.Open(directory)
 	if err != nil { // can't open? just ignore it
 		return
@@ -110,11 +110,11 @@ func parseDir(options map[string]string, directory string, stdout io.Writer) {
 		}
 		if ok {
 			filename := fileinfo.Name()
-			printIfMached(options, directory, filename, stdout)
+			printIfMached(options, directory, filename, outChan)
 		}
 		if fileinfo.IsDir() {
-			parseDir(options, filepath.Join(directory, filename),
-				stdout)
+			go parseDir(options, filepath.Join(directory, filename),
+				outChan)
 		}
 	}
 }
@@ -135,7 +135,19 @@ func Find(options map[string]string, stdout io.Writer) {
 			options["filetype_"+filetype] = "true"
 		}
 	}
-	parseDir(options, options["directory"], stdout)
+
+	outChan := make(chan string)
+
+	_, err := os.Open(options["directory"])
+	if err == nil {
+		go printFile(options["directory"], "", outChan)
+	}
+	go parseDir(options, options["directory"], outChan)
+
+	// this is where the printing happens
+	for line := range outChan {
+		fmt.Fprintf(stdout, line)
+	}
 }
 
 func main() {
