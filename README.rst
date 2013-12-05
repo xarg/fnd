@@ -2,8 +2,9 @@ fnd
 ======
 .. image:: https://secure.travis-ci.org/humanfromearth/fnd.png?branch=master
 
-A golang implementation of the popular find unix utility.
+.. note: This was just an experiment. It's much slower than the unix find command. 
 
+A golang implementation of the popular find unix utility.
 
 The main reason I coded this is because I find myself writing this a lot::
 
