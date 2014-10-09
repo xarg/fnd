@@ -23,7 +23,7 @@ Install
 ---------
 ::
 
-        go get -u github.com/humanfromearth/fnd
+        go get -u github.com/xarg/fnd
 
 Example
 ---------------------------------
