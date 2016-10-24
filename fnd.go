@@ -113,6 +113,7 @@ func parseDir(options map[string]string, directory string, stdout io.Writer) {
 			printIfMached(options, directory, filename, stdout)
 		}
 		if fileinfo.IsDir() {
+			filename := fileinfo.Name()
 			parseDir(options, filepath.Join(directory, filename),
 				stdout)
 		}
